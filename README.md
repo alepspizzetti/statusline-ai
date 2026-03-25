@@ -31,27 +31,116 @@ O script `statusline-command.sh` é executado pelo Claude CLI a cada interação
 - **Limites de Taxa (Rate Limits):** Alertas visuais para o uso das cotas de 5 horas e 7 dias.
 - **Rastreamento de Custo:** Exibe o custo total acumulado da sessão em USD com precisão de 4 casas decimais.
 
-## 🛠️ Instalação
+## 🛠️ Instalação (Git clone + updates via `git pull`)
 
-Para instalar e ativar esta statusline, siga os passos abaixo:
+A forma mais simples de distribuir e manter todo mundo atualizado é instalar via **Git** em `~/.claude/statusline` e atualizar com `git pull`.
 
-1. Certifique-se de que o script está na pasta correta: `~/.claude/statusline/statusline-command.sh`.
-2. Dê permissão de execução ao script:
-   ```bash
-   chmod +x ~/.claude/statusline/statusline-command.sh
-   ```
-3. Edite o seu arquivo de configurações do Claude CLI (geralmente em `~/.claude/settings.json`) e adicione/altere a seção `statusLine`:
+### ✅ Pré-requisitos
+- **Claude CLI**
+- **Git**
+- **Bash**
+  - Windows: **Git for Windows** (Git Bash) já resolve.
+  - macOS: bash/zsh nativo.
+- **jq (opcional)** ou **python/python3** (fallback já usado pelo script)
 
-```json
-{
-  "statusLine": {
-    "type": "command",
-    "command": "bash /c/Users/aless/.claude/statusline/statusline-command.sh"
-  }
-}
+### ⭐ Instalação via script (recomendado)
+No **macOS/Linux**: rode no Terminal.
+
+No **Windows**: rode no **Git Bash** (Git for Windows) ou via **WSL** (o `.sh` não executa nativamente no PowerShell).
+
+**1 comando (recomendado):**
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/alepspizzetti/statusline-ai/HEAD/install.sh | bash
 ```
 
-*Nota: O caminho pode variar dependendo do seu sistema operacional (no Windows/Git Bash use o caminho estilo Unix como no exemplo acima).*
+Isso vai:
+- clonar/atualizar em `~/.claude/statusline`
+- configurar `~/.claude/settings.json` com o `statusLine`
+
+---
+
+### 1) Windows (PowerShell) — instalar/atualizar + configurar
+Copie/cole no PowerShell:
+
+```powershell
+$repo = "https://github.com/alepspizzetti/statusline-ai.git"
+$dest = Join-Path $HOME ".claude\statusline"
+
+if (Test-Path (Join-Path $dest ".git")) {
+  git -C $dest pull --ff-only
+} else {
+  New-Item -ItemType Directory -Path (Split-Path $dest) -Force | Out-Null
+  git clone $repo $dest
+}
+
+$settingsPath = Join-Path $HOME ".claude\settings.json"
+New-Item -ItemType Directory -Path (Split-Path $settingsPath) -Force | Out-Null
+
+$settings = @{}
+if (Test-Path $settingsPath) {
+  try { $settings = (Get-Content $settingsPath -Raw | ConvertFrom-Json -AsHashtable) } catch { $settings = @{} }
+}
+
+$settings["statusLine"] = @{ type = "command"; command = 'bash -lc "~/.claude/statusline/statusline-command.sh"' }
+$settings | ConvertTo-Json -Depth 10 | Set-Content -Encoding UTF8 $settingsPath
+```
+
+> Se o `bash` não estiver no PATH, abra o **Git Bash** uma vez (ele geralmente ajusta o PATH), ou use o caminho completo do `bash.exe`.
+
+### 2) macOS (zsh/bash) — instalar/atualizar + configurar
+Copie/cole no terminal:
+
+```bash
+REPO="https://github.com/alepspizzetti/statusline-ai.git"
+DEST="$HOME/.claude/statusline"
+
+mkdir -p "$HOME/.claude"
+if [ -d "$DEST/.git" ]; then
+  git -C "$DEST" pull --ff-only
+else
+  git clone "$REPO" "$DEST"
+fi
+
+chmod +x "$DEST/statusline-command.sh"
+
+python3 - <<'PY'
+import json, os
+settings_path = os.path.expanduser('~/.claude/settings.json')
+os.makedirs(os.path.dirname(settings_path), exist_ok=True)
+
+data = {}
+if os.path.exists(settings_path):
+    try:
+        with open(settings_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+    except Exception:
+        data = {}
+
+data['statusLine'] = {
+  'type': 'command',
+  'command': 'bash -lc "~/.claude/statusline/statusline-command.sh"'
+}
+
+with open(settings_path, 'w', encoding='utf-8') as f:
+    json.dump(data, f, indent=2)
+    f.write('\n')
+PY
+```
+
+### 🔄 Atualizar depois
+A qualquer momento:
+
+```bash
+git -C ~/.claude/statusline pull --ff-only
+```
+
+### ♻️ Auto-update (opcional)
+Se quiser automatizar, a ideia é agendar um `git pull --ff-only`:
+- **Windows (Task Scheduler):** rodar no logon ou daily: `powershell.exe -NoProfile -Command "git -C $HOME\.claude\statusline pull --ff-only"`
+- **macOS (LaunchAgent):** rodar periodicamente: `bash -lc 'git -C ~/.claude/statusline pull --ff-only'`
+
+(Se preferir, a gente pode adicionar scripts `update.ps1/update.sh` e os arquivos de agendamento no repo.)
 
 ## 📝 Legenda da Statusline
 
