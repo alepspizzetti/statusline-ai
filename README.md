@@ -145,7 +145,7 @@ Se quiser automatizar, a ideia é agendar um `git pull --ff-only`:
 ## 📝 Legenda da Statusline
 
 A saída segue este padrão visual:
-`Modelo [branch] | ctx: 25% [###-------]/200k | msgs: 15 | Limits(5h:10% | 7d:5%) | prompt: 1.2k | $0.0045`
+`Modelo [branch] | ctx: 25% [###-------]/200k | tokens: ↑1.2k ↓567 | Limits(5h:10% | 7d:5%) | $0.0045`
 
 | Campo | Descrição | Cores |
 | :--- | :--- | :--- |
@@ -154,9 +154,8 @@ A saída segue este padrão visual:
 | **ctx: X%** | Percentual de uso da janela de contexto. | Verde/Amarelo/Vermelho |
 | **[###---]** | Barra visual de uso do contexto. | Colorida conforme o % |
 | **200k** | Tamanho total da janela de contexto. | Vermelho |
-| **msgs** | Total de mensagens enviadas hoje. | Ciano |
+| **tokens** | Fluxo da interação atual: entrada (↑) e saída (↓). | Ciano (↑) / Verde (↓) |
 | **5h / 7d** | Uso das cotas de rate limit. | Ciano (baixo) / Amarelo (médio) / Vermelho (alto) |
-| **prompt** | Tokens de entrada no último prompt. | Branco |
 | **$0.0000** | Custo total da sessão em dólares. | Amarelo |
 
 ## 📦 Dependências

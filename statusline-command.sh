@@ -12,6 +12,7 @@ parse_json() {
         (.context_window.used_percentage // 0 | tostring),
         (.context_window.context_window_size // 200000 | tostring),
         (.context_window.current_usage.input_tokens // 0 | tostring),
+        (.context_window.current_usage.output_tokens // 0 | tostring),
         (.cost.total_cost_usd // 0 | tostring),
         (.rate_limits.five_hour.used_percentage // 0 | tostring),
         (.rate_limits.seven_day.used_percentage // 0 | tostring),
@@ -40,6 +41,7 @@ fields = [
     str(get_val(cw, 'used_percentage', 0)),
     str(get_val(cw, 'context_window_size', 200000)),
     str(get_val(cu, 'input_tokens', 0)),
+    str(get_val(cu, 'output_tokens', 0)),
     str(get_val(d.get('cost', {}), 'total_cost_usd', 0)),
     str(get_val(rl.get('five_hour', {}), 'used_percentage', 0)),
     str(get_val(rl.get('seven_day', {}), 'used_percentage', 0)),
@@ -51,39 +53,12 @@ print('\t'.join(fields))
   fi
 }
 
-IFS=$'\t' read -r cwd model_name used_pct ctx_size ctx_input cost_usd limit_5h limit_7d reset_5h reset_7d \
+IFS=$'\t' read -r cwd model_name used_pct ctx_size ctx_input ctx_output cost_usd limit_5h limit_7d reset_5h reset_7d \
   <<< "$(parse_json)"
 
 # Limpeza de valores para garantir que sejam números
 [[ "$used_pct" == "None" || "$used_pct" == "null" || -z "$used_pct" ]] && used_pct=0
 [[ "$ctx_size" == "None" || "$ctx_size" == "null" || -z "$ctx_size" ]] && ctx_size=200000
-
-# ── extração de mensagens de hoje (stats-cache.json) ──────────────────────────
-STATS_FILE="$HOME/.claude/statusline/stats-cache.json"
-TODAY=$(date +"%Y-%m-%d")
-MSG_TODAY="0"
-
-if [ -f "$STATS_FILE" ]; then
-  if command -v jq >/dev/null 2>&1; then
-    MSG_TODAY=$(jq -r --arg TODAY "$TODAY" '.dailyActivity[] | select(.date == $TODAY) | .messageCount' "$STATS_FILE" 2>/dev/null || echo "0")
-  else
-    py=$(command -v python 2>/dev/null || command -v python3 2>/dev/null)
-    if [ -n "$py" ]; then
-      MSG_TODAY=$("$py" -c "
-import json, sys
-try:
-    with open(sys.argv[1]) as f:
-        data = json.load(f)
-        for day in data.get('dailyActivity', []):
-            if day.get('date') == sys.argv[2]:
-                print(day.get('messageCount', 0))
-                sys.exit(0)
-except: pass
-print(0)
-" "$STATS_FILE" "$TODAY")
-    fi
-  fi
-fi
 
 # ── git branch ────────────────────────────────────────────────────────────────
 git_info=""
@@ -113,6 +88,7 @@ fmt_pct() {
 }
 
 ctx_input_fmt=$(fmt_k "$ctx_input")
+ctx_output_fmt=$(fmt_k "$ctx_output")
 ctx_size_fmt=$(fmt_k "$ctx_size")
 used_pct_num=$(normalize_num "$used_pct")
 limit_5h_num=$(normalize_num "$limit_5h")
@@ -172,16 +148,16 @@ fmt_rate() {
   echo -n "${WHITE}${label}:${color}${val_fmt}%${countdown}${RESET}"
 }
 
-usage_info="${GRAY} | ${WHITE}msgs: ${CYAN}${MSG_TODAY}${RESET}${GRAY} | ${WHITE}Limits($(fmt_rate "$limit_5h_num" "5h" "$reset_5h")${GRAY} | ${RESET}$(fmt_rate "$limit_7d_num" "7d" "$reset_7d")${WHITE})${RESET}"
+token_flow="${WHITE}tokens: ${CYAN}↑${ctx_input_fmt}${GRAY} ${GREEN}↓${ctx_output_fmt}${RESET}"
+usage_info="${GRAY} | ${token_flow}${GRAY} | ${WHITE}Limits($(fmt_rate "$limit_5h_num" "5h" "$reset_5h")${GRAY} | ${RESET}$(fmt_rate "$limit_7d_num" "7d" "$reset_7d")${WHITE})${RESET}"
 
 # ── shorten model name ────────────────────────────────────────────────────────
 model_short=$(echo "$model_name" | sed 's/Claude //' | sed 's/ [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}//')
 
 # ── final output ──────────────────────────────────────────────────────────────
-printf "${CYAN}%s${BLUE}%s${GRAY} | %s${GRAY} | ${BLUE}prompt: ${WHITE}%s%s${GRAY} | ${YELLOW}\$%s${RESET}" \
+printf "${CYAN}%s${BLUE}%s${GRAY} | %s%s${GRAY} | ${YELLOW}\$%s${RESET}" \
   "$model_short" \
   "$git_info" \
   "$ctx_display" \
-  "$ctx_input_fmt" \
   "$usage_info" \
   "$(printf "%.4f" "${cost_usd:-0}")"
