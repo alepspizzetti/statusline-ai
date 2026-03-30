@@ -26,7 +26,7 @@ O script `statusline-command.sh` é executado pelo Claude CLI a cada interação
 - **Identificação do Modelo:** Exibe o nome do modelo de forma compacta (remove o prefixo "Claude" e sufixos de data).
 - **Integração com Git:** Mostra a branch atual se você estiver dentro de um repositório Git.
 - **Monitoramento de Contexto:** Uma barra de progresso visual (0-100%) com cores dinâmicas (Verde < 70%, Amarelo < 90%, Vermelho >= 90%).
-- **Contagem de Tokens:** Exibe os tokens de entrada do prompt atual (formatados em 'k').
+- **Contagem de Tokens:** Exibe os tokens acumulados da sessão (entrada `↑` e saída `↓`, formatados em `k`) para evitar resets visuais entre atualizações.
 - **Estatísticas Diárias:** Mostra quantas mensagens foram enviadas hoje com base no `stats-cache.json`.
 - **Limites de Taxa (Rate Limits):** Alertas visuais para o uso das cotas de 5 horas e 7 dias.
 - **Rastreamento de Custo:** Exibe o custo total acumulado da sessão em USD com precisão de 4 casas decimais.
