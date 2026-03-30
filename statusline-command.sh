@@ -97,8 +97,26 @@ fi
 fmt_k() {
   awk -v n="$1" 'BEGIN { if (n+0 >= 1000) printf "%.1fk", n/1000; else printf "%d", n+0 }'
 }
+
+normalize_num() {
+  local v="$1"
+  [[ "$v" == "None" || "$v" == "null" || -z "$v" ]] && { echo "0"; return; }
+  v="${v//,/.}"
+  awk -v n="$v" 'BEGIN { printf "%.12f", n+0 }'
+}
+
+fmt_pct() {
+  local n out
+  n=$(normalize_num "$1")
+  out=$(awk -v n="$n" 'BEGIN { printf "%.2f", n+0 }')
+  echo "${out/./,}"
+}
+
 ctx_input_fmt=$(fmt_k "$ctx_input")
 ctx_size_fmt=$(fmt_k "$ctx_size")
+used_pct_num=$(normalize_num "$used_pct")
+limit_5h_num=$(normalize_num "$limit_5h")
+limit_7d_num=$(normalize_num "$limit_7d")
 
 # ── ANSI colors ───────────────────────────────────────────────────────────────
 RED=$'\033[31m'
@@ -111,19 +129,23 @@ GRAY=$'\033[90m'
 RESET=$'\033[0m'
 
 # ── context bar ───────────────────────────────────────────────────────────────
-bar=$(awk -v p="$used_pct" 'BEGIN {
+bar=$(awk -v p="$used_pct_num" 'BEGIN {
   filled = int(p / 10 + 0.5); if (filled > 10) filled = 10;
   bar = ""; for (i = 1; i <= filled; i++) bar = bar "#";
   for (i = filled+1; i <= 10; i++) bar = bar "-";
   print bar
 }')
-[ "$used_pct" -ge 90 ] && bar_color="$RED" || { [ "$used_pct" -ge 70 ] && bar_color="$YELLOW" || bar_color="$GREEN"; }
-ctx_display="${WHITE}ctx: ${bar_color}${used_pct}% [${bar}]${GRAY}/${RED}${ctx_size_fmt}${RESET}"
+awk -v v="$used_pct_num" 'BEGIN { exit !(v >= 90) }' && bar_color="$RED" || {
+  awk -v v="$used_pct_num" 'BEGIN { exit !(v >= 70) }' && bar_color="$YELLOW" || bar_color="$GREEN"
+}
+ctx_display="${WHITE}ctx: ${bar_color}$(fmt_pct "$used_pct_num")% [${bar}]${GRAY}/${RED}${ctx_size_fmt}${RESET}"
 
 # ── rate limits (msg count + quotas) ─────────────────────────────────────────
 fmt_rate() {
   local val="$1" label="$2" reset="$3"
-  [[ "$val" == "None" || "$val" == "null" || -z "$val" ]] && val=0
+  val=$(normalize_num "$val")
+  local val_fmt
+  val_fmt=$(fmt_pct "$val")
 
   local color="$CYAN"
   awk -v v="$val" 'BEGIN { exit !(v+0 >= 80) }' 2>/dev/null && color="$RED" || { awk -v v="$val" 'BEGIN { exit !(v+0 >= 50) }' 2>/dev/null && color="$YELLOW"; }
@@ -147,10 +169,10 @@ fmt_rate() {
     fi
   fi
 
-  echo -n "${WHITE}${label}:${color}${val}%${countdown}${RESET}"
+  echo -n "${WHITE}${label}:${color}${val_fmt}%${countdown}${RESET}"
 }
 
-usage_info="${GRAY} | ${WHITE}msgs: ${CYAN}${MSG_TODAY}${RESET}${GRAY} | ${WHITE}Limits($(fmt_rate "$limit_5h" "5h" "$reset_5h")${GRAY} | ${RESET}$(fmt_rate "$limit_7d" "7d" "$reset_7d")${WHITE})${RESET}"
+usage_info="${GRAY} | ${WHITE}msgs: ${CYAN}${MSG_TODAY}${RESET}${GRAY} | ${WHITE}Limits($(fmt_rate "$limit_5h_num" "5h" "$reset_5h")${GRAY} | ${RESET}$(fmt_rate "$limit_7d_num" "7d" "$reset_7d")${WHITE})${RESET}"
 
 # ── shorten model name ────────────────────────────────────────────────────────
 model_short=$(echo "$model_name" | sed 's/Claude //' | sed 's/ [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}//')
