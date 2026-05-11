@@ -145,7 +145,7 @@ Se quiser automatizar, a ideia é agendar um `git pull --ff-only`:
 ## 📝 Legenda da Statusline
 
 A saída segue este padrão visual:
-`Modelo [branch] | ctx: 25% [###-------]/200k | tokens: ↑1.2k ↓567 | Limits(5h:10% | 7d:5%) | $0.0045`
+`Modelo [branch] | ctx: 25% [###-------]/200k | tokens: ↑1.2k ↓567 | Limits(5h:10%@13:15(2h:28m) | 7d:5%@sex 23:00(4d11h)) | $0.0045`
 
 | Campo | Descrição | Cores |
 | :--- | :--- | :--- |

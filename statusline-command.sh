@@ -80,6 +80,41 @@ normalize_num() {
   awk -v n="$v" 'BEGIN { printf "%.12f", n+0 }'
 }
 
+format_reset_time() {
+  local ts="$1"
+  local formatted=""
+
+  formatted=$(date -d "@$ts" +%H:%M 2>/dev/null) || formatted=""
+  if [[ -z "$formatted" ]]; then
+    formatted=$(date -r "$ts" +%H:%M 2>/dev/null) || formatted=""
+  fi
+
+  echo "$formatted"
+}
+
+format_reset_day_time() {
+  local ts="$1"
+  local formatted=""
+
+  formatted=$(date -d "@$ts" +'%a %H:%M' 2>/dev/null) || formatted=""
+  if [[ -z "$formatted" ]]; then
+    formatted=$(date -r "$ts" +'%a %H:%M' 2>/dev/null) || formatted=""
+  fi
+
+  formatted=$(echo "$formatted" | tr '[:upper:]' '[:lower:]')
+  case "$formatted" in
+    mon\ *) formatted="seg ${formatted#mon }" ;;
+    tue\ *) formatted="ter ${formatted#tue }" ;;
+    wed\ *) formatted="qua ${formatted#wed }" ;;
+    thu\ *) formatted="qui ${formatted#thu }" ;;
+    fri\ *) formatted="sex ${formatted#fri }" ;;
+    sat\ *) formatted="sab ${formatted#sat }" ;;
+    sun\ *) formatted="dom ${formatted#sun }" ;;
+  esac
+
+  echo "$formatted"
+}
+
 fmt_pct() {
   local n out
   n=$(normalize_num "$1")
@@ -131,16 +166,30 @@ fmt_rate() {
     local now=$(date +%s)
     local diff=$((reset - now))
     if [[ "$diff" -gt 0 ]]; then
+      local reset_at
+      if [[ "$label" == "7d" ]]; then
+        reset_at=$(format_reset_day_time "$reset")
+      else
+        reset_at=$(format_reset_time "$reset")
+      fi
+      local remaining=""
+
       if [[ "$diff" -ge 86400 ]]; then
         local days=$((diff / 86400))
         local hours=$(( (diff % 86400) / 3600 ))
-        countdown=" ${GRAY}@${days}d${hours}h${RESET}"
+        remaining="${days}d${hours}h"
       elif [[ "$diff" -ge 3600 ]]; then
         local hours=$((diff / 3600))
         local mins=$(( (diff % 3600) / 60 ))
-        countdown=" ${GRAY}@${hours}h${mins}m${RESET}"
+        remaining="${hours}h:${mins}m"
       else
-        countdown=" ${GRAY}@$((diff / 60))m${RESET}"
+        remaining="$((diff / 60))m"
+      fi
+
+      if [[ -n "$reset_at" ]]; then
+        countdown=" ${GRAY}@${reset_at}(${remaining})${RESET}"
+      else
+        countdown=" ${GRAY}@${remaining}${RESET}"
       fi
     fi
   fi
