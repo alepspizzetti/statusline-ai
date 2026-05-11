@@ -1,13 +1,13 @@
 # Claude Statusline Customizer
 
-Este projeto contém um script customizado para a `statusLine` do Claude CLI, fornecendo informações em tempo real sobre a sessão, uso de modelos, custos e limites de taxa de forma visual e organizada.
+Este projeto contém um script customizado para a `statusLine` do Claude CLI, fornecendo informações em tempo real sobre a sessão, uso de modelos e limites de taxa de forma visual e organizada.
 
 ## 🚀 Como Funciona
 
 O script `statusline-command.sh` é executado pelo Claude CLI a cada interação. Ele funciona da seguinte forma:
 
 1. **Captura de Dados:** Recebe um JSON contendo o estado atual da sessão via `stdin`.
-2. **Snapshot de Depuração:** Salva o JSON recebido em `last_input.json` para permitir inspeção manual dos dados brutos (tokens, custos exatos, etc).
+2. **Snapshot de Depuração:** Salva o JSON recebido em `last_input.json` para permitir inspeção manual dos dados brutos (tokens, limites, etc).
 3. **Processamento:** Extrai os campos necessários usando `jq` (ou `python` como fallback).
 4. **Estatísticas Persistentes:** Lê o arquivo `stats-cache.json` para recuperar o histórico de mensagens do dia.
 5. **Saída Visual:** Imprime uma linha única formatada com cores ANSI para o terminal.
@@ -25,11 +25,10 @@ O script `statusline-command.sh` é executado pelo Claude CLI a cada interação
 
 - **Identificação do Modelo:** Exibe o nome do modelo de forma compacta (remove o prefixo "Claude" e sufixos de data).
 - **Integração com Git:** Mostra a branch atual se você estiver dentro de um repositório Git.
-- **Monitoramento de Contexto:** Uma barra de progresso visual (0-100%) com cores dinâmicas (Verde < 70%, Amarelo < 90%, Vermelho >= 90%).
+- **Monitoramento de Contexto:** Exibe o uso da janela de contexto de forma compacta, com percentual e volume usado/total.
 - **Contagem de Tokens:** Exibe os tokens acumulados da sessão (entrada `↑` e saída `↓`, formatados em `k`) para evitar resets visuais entre atualizações.
 - **Estatísticas Diárias:** Mostra quantas mensagens foram enviadas hoje com base no `stats-cache.json`.
 - **Limites de Taxa (Rate Limits):** Alertas visuais para o uso das cotas de 5 horas e 7 dias.
-- **Rastreamento de Custo:** Exibe o custo total acumulado da sessão em USD com precisão de 4 casas decimais.
 
 ## 🛠️ Instalação (Git clone + updates via `git pull`)
 
@@ -145,18 +144,16 @@ Se quiser automatizar, a ideia é agendar um `git pull --ff-only`:
 ## 📝 Legenda da Statusline
 
 A saída segue este padrão visual:
-`Modelo [branch] | ctx: 25% [###-------]/200k | tokens: ↑1.2k ↓567 | Limits(5h:10%@13:15(2h:28m) | 7d:5%@sex 23:00(4d11h)) | $0.0045`
+`Modelo [branch] | ctx: 25% [50k/200k] | tokens: ↑1.2k ↓567 | Limits(5h:10%@13:15(2h:28m) | 7d:5%@sex 23:00(4d11h))`
 
 | Campo | Descrição | Cores |
 | :--- | :--- | :--- |
 | **Modelo** | Nome abreviado do modelo em uso. | Ciano |
 | **[branch]** | Branch Git atual (se disponível). | Azul |
 | **ctx: X%** | Percentual de uso da janela de contexto. | Verde/Amarelo/Vermelho |
-| **[###---]** | Barra visual de uso do contexto. | Colorida conforme o % |
-| **200k** | Tamanho total da janela de contexto. | Vermelho |
+| **[50k/200k]** | Uso atual e total da janela de contexto. | Colorida conforme o % |
 | **tokens** | Fluxo da interação atual: entrada (↑) e saída (↓). | Ciano (↑) / Verde (↓) |
 | **5h / 7d** | Uso das cotas de rate limit. | Ciano (baixo) / Amarelo (médio) / Vermelho (alto) |
-| **$0.0000** | Custo total da sessão em dólares. | Amarelo |
 
 ## 📦 Dependências
 

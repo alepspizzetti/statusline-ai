@@ -13,7 +13,6 @@ parse_json() {
         (.context_window.context_window_size // 200000 | tostring),
         (.context_window.total_input_tokens // .context_window.current_usage.input_tokens // 0 | tostring),
         (.context_window.total_output_tokens // .context_window.current_usage.output_tokens // 0 | tostring),
-        (.cost.total_cost_usd // 0 | tostring),
         (.rate_limits.five_hour.used_percentage // 0 | tostring),
         (.rate_limits.seven_day.used_percentage // 0 | tostring),
         (.rate_limits.five_hour.resets_at // 0 | tostring),
@@ -42,7 +41,6 @@ fields = [
     str(get_val(cw, 'context_window_size', 200000)),
     str(get_val(cw, 'total_input_tokens', get_val(cu, 'input_tokens', 0))),
     str(get_val(cw, 'total_output_tokens', get_val(cu, 'output_tokens', 0))),
-    str(get_val(d.get('cost', {}), 'total_cost_usd', 0)),
     str(get_val(rl.get('five_hour', {}), 'used_percentage', 0)),
     str(get_val(rl.get('seven_day', {}), 'used_percentage', 0)),
     str(get_val(rl.get('five_hour', {}), 'resets_at', 0)),
@@ -53,7 +51,7 @@ print('\t'.join(fields))
   fi
 }
 
-IFS=$'\t' read -r cwd model_name used_pct ctx_size ctx_input ctx_output cost_usd limit_5h limit_7d reset_5h reset_7d \
+IFS=$'\t' read -r cwd model_name used_pct ctx_size ctx_input ctx_output limit_5h limit_7d reset_5h reset_7d \
   <<< "$(parse_json)"
 
 # Limpeza de valores para garantir que sejam números
@@ -71,6 +69,19 @@ fi
 # ── helpers ───────────────────────────────────────────────────────────────────
 fmt_k() {
   awk -v n="$1" 'BEGIN { if (n+0 >= 1000) printf "%.1fk", n/1000; else printf "%d", n+0 }'
+}
+
+fmt_compact() {
+  awk -v n="$1" 'BEGIN {
+    n += 0
+    if (n >= 1000) {
+      scaled = n / 1000
+      if (scaled == int(scaled)) printf "%dk", scaled
+      else printf "%.1fk", scaled
+    } else {
+      printf "%d", n
+    }
+  }'
 }
 
 normalize_num() {
@@ -122,12 +133,21 @@ fmt_pct() {
   echo "${out/./,}"
 }
 
+fmt_pct_int() {
+  local n
+  n=$(normalize_num "$1")
+  awk -v n="$n" 'BEGIN { printf "%d", n + 0.5 }'
+}
+
 ctx_input_fmt=$(fmt_k "$ctx_input")
 ctx_output_fmt=$(fmt_k "$ctx_output")
-ctx_size_fmt=$(fmt_k "$ctx_size")
+ctx_size_fmt=$(fmt_compact "$ctx_size")
 used_pct_num=$(normalize_num "$used_pct")
 limit_5h_num=$(normalize_num "$limit_5h")
 limit_7d_num=$(normalize_num "$limit_7d")
+ctx_used_tokens=$(awk -v p="$used_pct_num" -v size="$ctx_size" 'BEGIN { printf "%.0f", (p * size) / 100 }')
+ctx_used_fmt=$(fmt_compact "$ctx_used_tokens")
+ctx_pct_fmt=$(fmt_pct_int "$used_pct_num")
 
 # ── ANSI colors ───────────────────────────────────────────────────────────────
 RED=$'\033[31m'
@@ -139,17 +159,11 @@ WHITE=$'\033[97m'
 GRAY=$'\033[90m'
 RESET=$'\033[0m'
 
-# ── context bar ───────────────────────────────────────────────────────────────
-bar=$(awk -v p="$used_pct_num" 'BEGIN {
-  filled = int(p / 10 + 0.5); if (filled > 10) filled = 10;
-  bar = ""; for (i = 1; i <= filled; i++) bar = bar "#";
-  for (i = filled+1; i <= 10; i++) bar = bar "-";
-  print bar
-}')
+# ── context summary ───────────────────────────────────────────────────────────
 awk -v v="$used_pct_num" 'BEGIN { exit !(v >= 90) }' && bar_color="$RED" || {
   awk -v v="$used_pct_num" 'BEGIN { exit !(v >= 70) }' && bar_color="$YELLOW" || bar_color="$GREEN"
 }
-ctx_display="${WHITE}ctx: ${bar_color}$(fmt_pct "$used_pct_num")% [${bar}]${GRAY}/${RED}${ctx_size_fmt}${RESET}"
+ctx_display="${WHITE}ctx: ${bar_color}${ctx_pct_fmt}% ${GRAY}[${bar_color}${ctx_used_fmt}${GRAY}/${RED}${ctx_size_fmt}${GRAY}]${RESET}"
 
 # ── rate limits (msg count + quotas) ─────────────────────────────────────────
 fmt_rate() {
@@ -204,9 +218,8 @@ usage_info="${GRAY} | ${token_flow}${GRAY} | ${WHITE}Limits($(fmt_rate "$limit_5
 model_short=$(echo "$model_name" | sed 's/Claude //' | sed 's/ [0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}//')
 
 # ── final output ──────────────────────────────────────────────────────────────
-printf "${CYAN}%s${BLUE}%s${GRAY} | %s%s${GRAY} | ${YELLOW}\$%s${RESET}" \
+printf "${CYAN}%s${BLUE}%s${GRAY} | %s%s${RESET}" \
   "$model_short" \
   "$git_info" \
   "$ctx_display" \
-  "$usage_info" \
-  "$(printf "%.4f" "${cost_usd:-0}")"
+  "$usage_info"
